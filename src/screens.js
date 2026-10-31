@@ -174,14 +174,16 @@ const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
 function describeAction(name, a) {
   const allIn = a.allIn ? ' (all-in)' : '';
+  // "You call" vs "Ada calls".
+  const v = (verb) => (name === 'You' ? verb : `${verb}s`);
   switch (a.type) {
-    case 'sb': return `${name} posts small blind ${fmt(a.put)}${allIn}`;
-    case 'bb': return `${name} posts big blind ${fmt(a.put)}${allIn}`;
-    case 'fold': return `${name} folds`;
-    case 'check': return `${name} checks`;
-    case 'call': return `${name} calls ${fmt(a.put)}${allIn}`;
-    case 'bet': return `${name} bets ${fmt(a.to)}${allIn}`;
-    case 'raise': return `${name} raises to ${fmt(a.to)}${allIn}`;
+    case 'sb': return `${name} ${v('post')} small blind ${fmt(a.put)}${allIn}`;
+    case 'bb': return `${name} ${v('post')} big blind ${fmt(a.put)}${allIn}`;
+    case 'fold': return `${name} ${v('fold')}`;
+    case 'check': return `${name} ${v('check')}`;
+    case 'call': return `${name} ${v('call')} ${fmt(a.put)}${allIn}`;
+    case 'bet': return `${name} ${v('bet')} ${fmt(a.to)}${allIn}`;
+    case 'raise': return `${name} ${v('raise')} to ${fmt(a.to)}${allIn}`;
     default: return `${name} ${a.type}`;
   }
 }
@@ -226,10 +228,9 @@ export function buildReplaySteps(hand, humanSeat) {
 
 export function replayView(hand, humanSeat) {
   const steps = buildReplaySteps(hand, humanSeat);
-  const shownSeats = new Set((hand.result?.shown ?? []).map((s) => s.seat));
   const winners = new Set((hand.result?.awards ?? []).filter((a) => !a.uncalled).flatMap((a) => a.winners));
   let index = 0;
-  let revealAll = false;
+  let fullBoard = false;
 
   const boardEl = h('div', { class: 'replay-board' });
   const potEl = h('div', { class: 'replay-pot' });
@@ -239,8 +240,8 @@ export function replayView(hand, humanSeat) {
   const logEl = h('ol', { class: 'replay-log' });
   const prev = h('button', { onclick: () => go(index - 1) }, '‹ Prev');
   const next = h('button', { onclick: () => go(index + 1) }, 'Next ›');
-  const reveal = h('input', { type: 'checkbox' });
-  reveal.onchange = () => { revealAll = reveal.checked; draw(); };
+  const boardToggle = h('input', { type: 'checkbox' });
+  boardToggle.onchange = () => { fullBoard = boardToggle.checked; draw(); };
 
   const logItems = steps.map((s, i) => h('li', { class: s.marker ? 'street' : '', onclick: () => go(i) }, s.text));
   logEl.append(...logItems);
@@ -252,15 +253,20 @@ export function replayView(hand, humanSeat) {
 
   function draw() {
     const step = steps[index];
+    // With "Show full board", cards from later streets appear dimmed.
     boardEl.replaceChildren(...Array.from({ length: 5 }, (_, i) => {
       const slot = h('div', { class: 'slot' });
-      if (step.board[i] != null) slot.replaceChildren(cardEl(step.board[i]));
+      const card = step.board[i] ?? (fullBoard ? hand.board[i] : null);
+      if (card != null) {
+        const el = cardEl(card);
+        if (step.board[i] == null) el.classList.add('dim');
+        slot.replaceChildren(el);
+      }
       return slot;
     }));
     const betTotal = [...step.bets.values()].reduce((a, b) => a + b, 0);
     potEl.textContent = step.final ? '' : `Pot ${fmt(step.pot + betTotal)}`;
     playersEl.replaceChildren(...hand.players.map((p) => {
-      const visible = p.seat === humanSeat || revealAll || (!!step.final && shownSeats.has(p.seat));
       const cls = ['rp-row'];
       if (step.actor === p.seat) cls.push('actor');
       if (step.folded.has(p.seat)) cls.push('folded');
@@ -268,7 +274,7 @@ export function replayView(hand, humanSeat) {
       const bet = step.bets.get(p.seat);
       return h('div', { class: cls.join(' ') },
         h('span', {}, nameOf(hand, p.seat, humanSeat), p.seat === hand.button ? ' Ⓓ' : ''),
-        h('span', { class: 'rp-cards' }, p.hole.map((c) => cardEl(c, visible))),
+        h('span', { class: 'rp-cards' }, p.hole.map((c) => cardEl(c)) /* history shows every hand, face up */),
         h('span', { class: 'rp-num' }, fmt(step.stacks.get(p.seat))),
         h('span', { class: 'rp-bet' }, bet ? fmt(bet) : ''));
     }));
@@ -281,9 +287,10 @@ export function replayView(hand, humanSeat) {
   }
 
   const root = h('div', { class: 'replay' },
-    boardEl, potEl, playersEl, textEl,
+    boardEl,
+    h('label', { class: 'check-row' }, boardToggle, 'Show full board'),
+    potEl, playersEl, textEl,
     h('div', { class: 'replay-nav' }, prev, countEl, next),
-    h('label', { class: 'check-row' }, reveal, 'Show all hole cards'),
     logEl);
   draw();
   return root;

@@ -297,6 +297,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .replay-board { display: flex; gap: 4px; justify-content: center; --card-w: 40px; }
 .replay-board .slot { border-radius: 5px; }
 .replay-pot { text-align: center; font-weight: 700; }
+.check-row { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; }
+.check-row input { width: 18px; height: 18px; accent-color: var(--accent); }
 .replay-players { display: flex; flex-direction: column; gap: 4px; }
 .rp-row {
   display: grid; grid-template-columns: 1fr auto 64px 56px; align-items: center; gap: 8px; padding: 5px 8px;
@@ -317,7 +319,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .replay-log li { padding: 5px 4px; border-bottom: 1px solid rgba(255, 255, 255, .04); cursor: pointer; }
 .replay-log li.street { color: var(--muted); font-weight: 700; }
 .replay-log li.current { background: rgba(245, 197, 66, .15); }
-.check-row { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 
 .help h3 { margin: 18px 0 6px; font-size: 15px; }
 .help h3:first-child { margin-top: 0; }

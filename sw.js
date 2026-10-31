@@ -2,7 +2,7 @@
 // Network-first, so a deployed update shows up on the next online launch.
 // Bump CACHE when the asset list changes.
 
-const CACHE = 'holdem-v6';
+const CACHE = 'holdem-v8';
 const ASSETS = [
   './',
   'index.html',
