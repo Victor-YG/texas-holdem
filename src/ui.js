@@ -225,6 +225,7 @@ export class TableUI {
 
       const hasCards = p.inHand && p.hole.length === 2 && (!p.folded || p.isHuman);
       const faceUp = p.isHuman || (snap.revealed && !p.folded);
+      seat.classList.toggle('revealed', hasCards && faceUp && !p.isHuman);
       const order = dealOrder.indexOf(i);
       seat.querySelectorAll('.cw').forEach((w, k) => {
         const delay = dealStagger ? (k * dealOrder.length + order) * dealStagger : 0;

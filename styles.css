@@ -118,6 +118,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .seat.human .cw + .cw { margin-left: 5px; }
 .seat.human .cw .card { transform: none; }
 .seat.human .cw .card.best { transform: translateY(-5px); }
+/* Face-up bot cards (showdown / all-in): side by side, fully visible above the plate. */
+.seat .cw { transition: margin .25s; }
+.seat .hole { transition: margin .25s; }
+.seat.revealed .hole { margin-bottom: 0; }
+.seat.revealed .cw + .cw { margin-left: 3px; }
+.seat.revealed .cw .card { transform: none; }
+.seat.revealed .cw .card.best { transform: translateY(-4px); }
 
 .plate {
   position: relative; z-index: 2; display: flex; align-items: center; gap: 5px; min-width: 80px; max-width: 120px;
