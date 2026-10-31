@@ -149,6 +149,7 @@ async function run(token, firstRun) {
     while (!game.handOver) {
       if (!alive()) return;
       const p = game.players[game.toAct];
+      ui.render(game.snapshot()); // event snapshots predate the turn passing to this player
       let action;
       if (p.isHuman) {
         action = await humanTurn();
