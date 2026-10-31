@@ -1,0 +1,15 @@
+{
+  "name": "texas-holdem",
+  "version": "1.0.0",
+  "private": true,
+  "description": "No-limit Texas Hold'em vs. bots. Zero-dependency PWA, installable on Android.",
+  "type": "module",
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "start:lan": "node tools/serve.mjs --lan",
+    "test": "node --test test/"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

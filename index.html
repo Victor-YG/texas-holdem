@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b2219">
+  <meta name="description" content="No-limit Texas Hold'em against bots. Works offline.">
+  <title>Texas Hold'em</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <button id="btn-menu" class="icon-btn" aria-label="Menu">☰</button>
+      <div class="title"><span id="blinds-label"></span><span class="dot">·</span><span id="hand-label"></span></div>
+      <button id="btn-hint" class="icon-btn" aria-label="Toggle odds hints" title="Odds hints">💡</button>
+      <button id="btn-sound" class="icon-btn" aria-label="Toggle sound" title="Sound">🔊</button>
+    </header>
+
+    <main id="table-area">
+      <div class="felt"></div>
+      <div id="center">
+        <div id="pot" class="pot"></div>
+        <div id="board" class="board"></div>
+        <div id="message" class="message"></div>
+      </div>
+      <div id="seats"></div>
+      <div id="hint-panel" class="hint" hidden></div>
+    </main>
+
+    <footer id="controls">
+      <div id="raise-panel" class="raise-panel" hidden>
+        <div id="raise-presets" class="presets"></div>
+        <div class="slider-row">
+          <button id="raise-minus" class="step-btn" aria-label="Decrease">−</button>
+          <input id="raise-slider" type="range" min="0" max="100" step="1" value="0" aria-label="Raise amount">
+          <button id="raise-plus" class="step-btn" aria-label="Increase">+</button>
+          <button id="raise-cancel" class="step-btn" aria-label="Close raise panel">✕</button>
+        </div>
+      </div>
+      <div id="action-row" class="action-row" hidden>
+        <button id="btn-fold" class="act fold">Fold</button>
+        <button id="btn-call" class="act call">Check</button>
+        <button id="btn-raise" class="act raise">Raise</button>
+      </div>
+      <button id="btn-deal" class="act deal" hidden>Deal</button>
+      <div id="waiting" class="waiting"></div>
+    </footer>
+  </div>
+
+  <div id="modal" class="modal" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <header>
+        <button id="modal-back" class="icon-btn" aria-label="Back" hidden>‹</button>
+        <h2 id="modal-title"></h2>
+        <button id="modal-close" class="icon-btn" aria-label="Close">✕</button>
+      </header>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
