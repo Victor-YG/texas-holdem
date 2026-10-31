@@ -178,15 +178,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ---------- controls ---------- */
 #controls { position: relative; flex: none; padding: 8px 10px 10px; min-height: 72px; display: flex; flex-direction: column; justify-content: flex-end; }
-.action-row { display: flex; gap: 8px; }
+.action-row { display: flex; gap: 6px; }
 .act {
-  flex: 1; height: 54px; border: 0; border-radius: 13px; font-size: 16px; font-weight: 800; color: #fff;
+  flex: 1; min-width: 0; height: 54px; border: 0; border-radius: 13px; font-size: 15px; font-weight: 800; color: #fff;
+  padding: 0 4px; line-height: 1.15;
   box-shadow: 0 3px 0 rgba(0, 0, 0, .35); transition: transform .08s, opacity .2s;
 }
 .act:active { transform: translateY(2px); box-shadow: none; }
-.act:disabled { opacity: .3; pointer-events: none; }
+.action-row .act:disabled { background: #3a4540; color: #8a958f; box-shadow: none; pointer-events: none; }
 .act.fold { background: var(--fold); }
 .act.call { background: var(--call); }
+.act.check { background: #3a7d55; }
 .act.raise { background: var(--raise); }
 .act.deal { width: 100%; flex: none; background: var(--accent); color: #222; position: relative; overflow: hidden; }
 .waiting { text-align: center; color: var(--muted); font-size: 14px; height: 54px; line-height: 54px; }

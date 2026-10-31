@@ -245,7 +245,7 @@ export function helpView() {
       h('li', {}, 'Launch it from your home screen: it runs full-screen and works offline.')),
     h('h3', {}, 'How to play'),
     h('p', {}, 'No-limit Texas Hold’em. Each player gets two private cards; five shared cards come in three rounds (flop, turn, river). Make the best five-card hand from any of your seven cards, or make everyone else fold.'),
-    h('p', {}, 'Tap Raise to open the bet slider, choose an amount (or a preset), then tap the button again to confirm. Tap a bot to see its style. On a keyboard: F fold, C check/call, R raise, Space deals the next hand.'),
+    h('p', {}, 'Tap Raise to open the bet slider, choose an amount (or a preset), then tap the button again to confirm. Tap a bot to see its style. On a keyboard: R raise, C call, K check, F fold, Space deals the next hand.'),
     h('h3', {}, 'Hand rankings (best first)'),
     h('ol', {},
       ['Straight flush — five in a row, same suit', 'Four of a kind', 'Full house — three of a kind + a pair',

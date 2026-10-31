@@ -56,6 +56,7 @@ export class TableUI {
     this.actionRow = $('action-row');
     this.btnFold = $('btn-fold');
     this.btnCall = $('btn-call');
+    this.btnCheck = $('btn-check');
     this.btnRaise = $('btn-raise');
     this.raisePanel = $('raise-panel');
     this.slider = $('raise-slider');
@@ -85,7 +86,9 @@ export class TableUI {
 
   _bind() {
     this.btnFold.onclick = () => this._resolve({ type: 'fold' });
-    this.btnCall.onclick = () => this._resolve({ type: this.legal?.canCheck ? 'check' : 'call' });
+    // Check and Call are separate buttons so a mis-tap can never put chips in.
+    this.btnCall.onclick = () => this._resolve({ type: 'call' });
+    this.btnCheck.onclick = () => this._resolve({ type: 'check' });
     this.btnRaise.onclick = () => {
       if (this.raisePanel.hidden) {
         this.raisePanel.hidden = false;
@@ -116,8 +119,9 @@ export class TableUI {
       if (!this.legal) return;
       const key = e.key.toLowerCase();
       if (key === 'f' && !this.btnFold.disabled) this.btnFold.click();
-      else if (key === 'c' || key === 'k') this.btnCall.click();
-      else if ((key === 'r' || key === 'b' || key === 'enter') && !this.btnRaise.hidden) this.btnRaise.click();
+      else if (key === 'c' && !this.btnCall.disabled) this.btnCall.click();
+      else if (key === 'k' && !this.btnCheck.disabled) this.btnCheck.click();
+      else if ((key === 'r' || key === 'b' || key === 'enter') && !this.btnRaise.disabled) this.btnRaise.click();
       else if (key === 'escape') this.raisePanel.hidden = true;
     });
   }
@@ -367,11 +371,14 @@ export class TableUI {
     this.legal = legal;
     this.unit = unit;
     this._mode('action');
+    // Inapplicable buttons are greyed out, never hidden, so the layout doesn't shift.
     this.btnFold.disabled = legal.canCheck; // never fold when checking is free
+    this.btnCheck.disabled = !legal.canCheck;
+    this.btnCall.disabled = legal.canCheck;
     this.btnCall.textContent = legal.canCheck
-      ? 'Check'
+      ? 'Call'
       : legal.toCall >= me.chips ? `All-in ${fmt(legal.toCall)}` : `Call ${fmt(legal.toCall)}`;
-    this.btnRaise.hidden = !legal.canRaise;
+    this.btnRaise.disabled = !legal.canRaise;
     if (legal.canRaise) this._setupRaise(legal);
     this.raisePanel.hidden = true;
     this._updateRaiseLabel();
@@ -421,7 +428,10 @@ export class TableUI {
   }
 
   _updateRaiseLabel() {
-    if (!this.legal?.canRaise) return;
+    if (!this.legal?.canRaise) {
+      this.btnRaise.textContent = 'Raise';
+      return;
+    }
     const word = this.legal.isBet ? 'Bet' : 'Raise';
     if (this.raisePanel.hidden) {
       this.btnRaise.textContent = `${word}…`;
