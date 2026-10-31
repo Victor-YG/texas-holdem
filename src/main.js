@@ -9,13 +9,15 @@ import { load, save, remove } from './storage.js';
 import { emptyStats, recordHand } from './stats.js';
 import { sfx, unlockAudio, setSoundEnabled } from './sound.js';
 import { TableUI, fmt } from './ui.js';
-import { menuView, settingsView, statsView, historyView, replayView, helpView } from './screens.js';
+import { menuView, settingsView, newGameView, gameOverView, statsView, historyView, replayView, helpView } from './screens.js';
+import { borrowsLeft, canBorrow, checkGameEnd, standings } from './match.js';
 
 const HUMAN = 0;
 const MAX_HISTORY = 50;
-const TABLE_KEYS = ['numBots', 'difficulty', 'smallBlind', 'bigBlind', 'stackBB'];
+const TABLE_KEYS = ['numBots', 'difficulty', 'smallBlind', 'bigBlind', 'stackBB', 'target', 'maxBorrows'];
 const DEFAULT_SETTINGS = {
   numBots: 5, difficulty: 'mixed', smallBlind: 10, bigBlind: 20, stackBB: 100,
+  target: 10000, maxBorrows: 5,
   speed: 'normal', hints: false, sound: true,
 };
 const SPEEDS = {
@@ -33,7 +35,7 @@ delete settings.autoDeal; // retired setting
 let stats = { ...emptyStats(), ...load('stats', {}) };
 let history = load('history', []);
 let game = null;
-let table = null; // { buyIn, config }
+let table = null; // { buyIn, config, target, maxBorrows, borrows[], continued, recorded }
 let loopToken = 0;
 
 const ui = new TableUI();
@@ -62,14 +64,24 @@ function createTable() {
       },
     })),
   ];
-  table = { buyIn, config: tableConfig() };
+  table = {
+    buyIn, config: tableConfig(), target: settings.target, maxBorrows: settings.maxBorrows,
+    borrows: players.map(() => 0), continued: false, recorded: false,
+  };
   return new Game({ players, smallBlind: settings.smallBlind, bigBlind: settings.bigBlind });
 }
 
 function restoreTable(saved) {
   try {
     if (!saved?.players?.length || saved.players.length < 2 || !saved.players[HUMAN]?.isHuman) return null;
-    table = { buyIn: saved.buyIn, config: saved.config };
+    // Tables saved before match rules existed get the default target and borrow limit.
+    table = {
+      buyIn: saved.buyIn, config: saved.config,
+      target: saved.target ?? DEFAULT_SETTINGS.target,
+      maxBorrows: saved.maxBorrows ?? DEFAULT_SETTINGS.maxBorrows,
+      borrows: saved.borrows ?? saved.players.map(() => 0),
+      continued: !!saved.continued, recorded: !!saved.recorded,
+    };
     return new Game({
       players: saved.players,
       smallBlind: saved.smallBlind,
@@ -83,7 +95,8 @@ function restoreTable(saved) {
 }
 
 function saveTable() {
-  save('table', { ...game.serialize(), buyIn: table.buyIn, config: table.config });
+  const { buyIn, config, target, maxBorrows, borrows, continued, recorded } = table;
+  save('table', { ...game.serialize(), buyIn, config, target, maxBorrows, borrows, continued, recorded });
 }
 
 function startTable(newGame, firstRun = false) {
@@ -100,7 +113,18 @@ function startTable(newGame, firstRun = false) {
 }
 
 function updateInfo() {
-  ui.setInfo(`Blinds ${fmt(game.smallBlind)}/${fmt(game.bigBlind)}`, `Hand #${game.handNumber}`);
+  const goal = table.target > 0 && !table.continued ? ` · Goal ${fmtShort(table.target)}` : '';
+  ui.setInfo(`Blinds ${fmt(game.smallBlind)}/${fmt(game.bigBlind)}${goal}`, `Hand #${game.handNumber}`);
+}
+
+function fmtShort(n) {
+  return n >= 1000 && n % 1000 === 0 ? `${n / 1000}k` : fmt(n);
+}
+
+function borrowsText(seat) {
+  const left = borrowsLeft(table, seat);
+  if (left === Infinity) return 'unlimited borrows';
+  return `${left} borrow${left === 1 ? '' : 's'} left`;
 }
 
 // ---------- hand loop ----------
@@ -112,6 +136,8 @@ async function run(token, firstRun) {
     const r = await ui.waitForDeal(game.handNumber ? 'Continue' : 'Start');
     if (r == null || !alive()) return;
     ui.setMessage('');
+    // A restored table may already be finished.
+    if (!(await resolveGameEnd(token))) return;
   }
   while (alive()) {
     if (!(await handleBusts(token)) || !alive()) return;
@@ -138,32 +164,107 @@ async function run(token, firstRun) {
     }
     if (!alive()) return;
     finishHand();
+    if (!(await resolveGameEnd(token))) return;
 
     // Wait for a tap so there's time to study the shown hands.
-    const r = await ui.waitForDeal('Deal next hand');
-    if (r == null || !alive()) return;
+    // (When you're busted, the Borrow button in handleBusts plays that role.)
+    if (game.players[HUMAN].chips > 0) {
+      const r = await ui.waitForDeal('Deal next hand');
+      if (r == null || !alive()) return;
+    }
   }
 }
 
-/** Bots rebuy automatically; the human is asked. Returns false if cancelled. */
-async function handleBusts(token) {
-  for (const p of game.players) {
-    if (!p.isHuman && p.chips <= 0) {
-      p.chips = table.buyIn;
-      ui.toast(`${p.name} rebuys for ${fmt(table.buyIn)}`);
+/**
+ * After a hand: if the match is decided, show the result and let the player
+ * keep playing (target reached) or start a new game. Returns true to continue
+ * dealing, false if this table's loop should stop.
+ */
+async function resolveGameEnd(token) {
+  const end = checkGameEnd(game.players, table, HUMAN);
+  if (!end) return true;
+  const won = end.winner === HUMAN;
+  if (!table.recorded) {
+    table.recorded = true;
+    stats.gamesPlayed++;
+    if (won) stats.gamesWon++;
+    save('stats', stats);
+    saveTable();
+  }
+  const who = won ? 'You' : game.players[end.winner]?.name;
+  const title = end.type === 'out' ? 'You’re out' : won ? '🏆 You win!' : `${who} wins`;
+  const detail = end.type === 'out'
+    ? 'You busted with no borrows left.'
+    : end.type === 'target'
+      ? `${who} reached ${fmt(table.target)} chips.`
+      : `${who} ${won ? 'are' : 'is'} the last player standing.`;
+  if (won) sfx.win();
+  ui.setMessage(won ? `${title} ${detail}`
+    : `Game over: ${end.type === 'out' ? 'you busted with no borrows left.' : detail}`);
+
+  // The same choices appear in the results sheet and, once it's closed, under the table.
+  const canContinue = end.type === 'target';
+  const choices = [
+    ...(canContinue ? [{ label: 'Keep playing', value: 'continue' }] : []),
+    { label: 'New game', value: 'new', primary: true },
+  ];
+  const showResults = () => ui.openModal(title, gameOverView({
+    detail, rows: standings(game.players, table), winner: end.winner, maxBorrows: table.maxBorrows,
+    actions: choices.map((c) => ({ ...c, onclick: () => ui.choose(c.value) })),
+  }));
+  showResults();
+  for (;;) {
+    const choice = await ui.waitForChoice([
+      ...choices.filter((c) => c.value === 'continue'),
+      { label: 'Results', value: 'results' },
+      ...choices.filter((c) => c.value === 'new'),
+    ]);
+    if (choice == null || token !== loopToken) return false;
+    if (choice === 'results') showResults();
+    else if (choice === 'new') openNewGame(); // starting a game replaces this loop
+    else {
+      table.continued = true;
+      saveTable();
+      updateInfo();
+      ui.closeModal();
+      ui.setMessage('');
+      ui.toast('No more target: play as long as you like');
+      return true;
     }
   }
+}
+
+/**
+ * Busted bots borrow a buy-in from the bank automatically, or are eliminated when
+ * they have no borrows left; the human is asked. Returns false if cancelled.
+ */
+async function handleBusts(token) {
+  const notes = [];
+  for (const p of game.players) {
+    if (p.isHuman || p.chips > 0 || p.eliminated) continue;
+    if (canBorrow(table, p.seat)) {
+      p.chips = table.buyIn;
+      table.borrows[p.seat]++;
+      notes.push(`${p.name} borrows ${fmt(table.buyIn)} (${borrowsText(p.seat)})`);
+    } else {
+      p.eliminated = true;
+      notes.push(`${p.name} is out`);
+    }
+  }
+  if (notes.length) ui.toast(notes.join(' · '), 3000);
   ui.render(game.snapshot());
   if (game.players[HUMAN].chips <= 0) {
-    ui.setMessage('You are out of chips.');
-    const r = await ui.waitForDeal(`Rebuy ${fmt(table.buyIn)}`);
+    ui.setMessage(`You’re out of chips. Borrow ${fmt(table.buyIn)} from the bank? (${borrowsText(HUMAN)})`);
+    const r = await ui.waitForDeal(`Borrow ${fmt(table.buyIn)}`);
     if (r == null || token !== loopToken) return false;
     game.players[HUMAN].chips = table.buyIn;
+    table.borrows[HUMAN]++;
     stats.rebuys++;
     save('stats', stats);
     ui.setMessage('');
     ui.render(game.snapshot());
   }
+  saveTable();
   return true;
 }
 
@@ -320,26 +421,31 @@ function scheduleHint(legal) {
 
 function openMenu() {
   ui.openModal('Menu', menuView([
+    ['🆕', 'New game', openNewGame],
     ['⚙️', 'Settings', openSettings],
     ['📊', 'Statistics', () => ui.openModal('Statistics', statsView(stats, resetStats), { push: true })],
     ['🕘', 'Hand history', openHistory],
-    ['🔄', 'New table', () => { ui.closeModal(); startTable(createTable(), true); }],
     ['❓', 'How to play & install', () => ui.openModal('Help', helpView(), { push: true })],
   ]));
 }
 
 function openSettings() {
   ui.openModal('Settings', settingsView(settings, (next) => {
-    const tableChanged = TABLE_KEYS.some((k) => String(next[k]) !== String(table.config?.[k]));
     settings = { ...settings, ...next };
     save('settings', settings);
     applyToggles();
     ui.closeModal();
-    if (tableChanged) {
-      ui.toast('New table started');
-      startTable(createTable(), true);
-    }
-  }), { push: true });
+  }), { push: !ui.modal.hidden });
+}
+
+/** Table, goal and borrowing options; starting replaces the current game. */
+function openNewGame() {
+  ui.openModal('New game', newGameView(settings, (next) => {
+    settings = { ...settings, ...next };
+    save('settings', settings);
+    ui.closeModal();
+    startTable(createTable());
+  }), { push: !ui.modal.hidden });
 }
 
 function openHistory() {
@@ -377,8 +483,9 @@ ui.$('btn-hint').onclick = () => {
 };
 ui.onSeatClick = (seat) => {
   const p = game.players[seat];
-  if (p.isHuman) return ui.toast(`You · ${fmt(p.chips)} chips`);
-  ui.toast(`${p.name}: ${DIFFICULTIES[p.bot.difficulty].label} · ${PERSONALITIES[p.bot.personality].label}`);
+  if (p.isHuman) return ui.toast(`You · ${fmt(p.chips)} chips · ${borrowsText(seat)}`);
+  if (p.eliminated) return ui.toast(`${p.name} is out`);
+  ui.toast(`${p.name}: ${DIFFICULTIES[p.bot.difficulty].label} · ${PERSONALITIES[p.bot.personality].label} · ${borrowsText(seat)}`);
 };
 document.addEventListener('pointerdown', unlockAudio, { passive: true });
 document.addEventListener('keydown', unlockAudio);

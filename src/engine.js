@@ -204,7 +204,7 @@ export class Game {
       players: this.players.map((p) => ({
         seat: p.seat, name: p.name, avatar: p.avatar, isHuman: !!p.isHuman,
         chips: p.chips, bet: p.bet, totalBet: p.totalBet, inHand: p.inHand,
-        folded: p.folded, allIn: p.allIn, hole: [...p.hole],
+        folded: p.folded, allIn: p.allIn, hole: [...p.hole], eliminated: !!p.eliminated,
         lastAction: p.lastAction && { ...p.lastAction },
       })),
     };
@@ -217,7 +217,7 @@ export class Game {
       bigBlind: this.bigBlind,
       button: this.button,
       handNumber: this.handNumber,
-      players: this.players.map(({ name, avatar, chips, isHuman, bot }) => ({ name, avatar, chips, isHuman, bot })),
+      players: this.players.map(({ name, avatar, chips, isHuman, bot, eliminated }) => ({ name, avatar, chips, isHuman, bot, eliminated })),
     };
   }
 

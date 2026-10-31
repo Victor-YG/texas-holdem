@@ -3,7 +3,7 @@
 export function emptyStats() {
   return {
     handsPlayed: 0, handsWon: 0, vpip: 0, pfr: 0, showdowns: 0, showdownsWon: 0,
-    net: 0, bbNet: 0, biggestPot: 0, rebuys: 0,
+    net: 0, bbNet: 0, biggestPot: 0, rebuys: 0, gamesPlayed: 0, gamesWon: 0,
   };
 }
 
@@ -38,6 +38,7 @@ const signed = (n) => (n > 0 ? `+${n.toLocaleString('en-US')}` : n.toLocaleStrin
 
 export function summarize(s) {
   return [
+    ['Games won', `${s.gamesWon} of ${s.gamesPlayed}`],
     ['Hands played', s.handsPlayed.toLocaleString('en-US')],
     ['Hands won', `${s.handsWon} (${pct(s.handsWon, s.handsPlayed)})`],
     ['Net chips', signed(Math.round(s.net))],
@@ -47,6 +48,6 @@ export function summarize(s) {
     ['Went to showdown', pct(s.showdowns, s.handsPlayed)],
     ['Won at showdown', pct(s.showdownsWon, s.showdowns)],
     ['Biggest pot won', s.biggestPot.toLocaleString('en-US')],
-    ['Rebuys', String(s.rebuys)],
+    ['Times borrowed', String(s.rebuys)],
   ];
 }

@@ -62,6 +62,7 @@ export class TableUI {
     this.slider = $('raise-slider');
     this.presetsEl = $('raise-presets');
     this.dealBtn = $('btn-deal');
+    this.choiceRow = $('choice-row');
     this.waitEl = $('waiting');
     this.modal = $('modal');
     this.modalTitle = $('modal-title');
@@ -216,10 +217,11 @@ export class TableUI {
     snap.players.forEach((p, i) => {
       const seat = this.seatEls[i];
       seat.classList.toggle('folded', p.folded);
-      seat.classList.toggle('out', !p.inHand);
+      seat.classList.toggle('out', !p.inHand || p.eliminated);
       seat.classList.toggle('active', snap.toAct === i && !snap.handOver);
       seat.classList.toggle('winner', winners.includes(i));
-      seat.querySelector('.stack').textContent = p.inHand && p.allIn && p.chips === 0 && !snap.handOver ? 'ALL-IN' : fmt(p.chips);
+      seat.querySelector('.stack').textContent = p.eliminated ? 'OUT'
+        : p.inHand && p.allIn && p.chips === 0 && !snap.handOver ? 'ALL-IN' : fmt(p.chips);
 
       const hasCards = p.inHand && p.hole.length === 2 && (!p.folded || p.isHuman);
       const faceUp = p.isHuman || (snap.revealed && !p.folded);
@@ -337,6 +339,7 @@ export class TableUI {
   _mode(mode) {
     this.actionRow.hidden = mode !== 'action';
     this.dealBtn.hidden = mode !== 'deal';
+    this.choiceRow.hidden = mode !== 'choice';
     this.waitEl.hidden = mode !== 'wait';
     if (mode !== 'action') this.raisePanel.hidden = true;
   }
@@ -364,6 +367,24 @@ export class TableUI {
   waitForDeal(label) {
     this._mode('deal');
     this.dealBtn.textContent = label;
+    return new Promise((resolve) => { this.pending = resolve; });
+  }
+
+  /** Answer the current waitForChoice from elsewhere (e.g. a button in a modal). */
+  choose(value) {
+    this._resolve(value);
+  }
+
+  /** Show a row of buttons; resolves with the chosen option's value. */
+  waitForChoice(options) {
+    this._mode('choice');
+    this.choiceRow.replaceChildren(...options.map(({ label, value, primary }) => {
+      const b = document.createElement('button');
+      b.className = `act ${primary ? 'deal' : 'neutral'}`;
+      b.textContent = label;
+      b.onclick = () => this._resolve(value);
+      return b;
+    }));
     return new Promise((resolve) => { this.pending = resolve; });
   }
 

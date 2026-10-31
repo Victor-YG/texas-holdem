@@ -29,7 +29,8 @@ To publish a real APK or Play Store listing later, wrap the same files with [Bub
 
 ## Features
 
-- 2–6 player tables (you plus 1–5 bots), configurable blinds and buy-in, auto-rebuy for bots.
+- 2–6 player tables (you plus 1–5 bots), configurable blinds and buy-in, chosen under Menu → New game.
+- Match rules: the first player to reach the chip goal (default 10,000) wins, with an option to keep playing. Busted players borrow a buy-in from the bank up to a limit (default 5); with none left they are out. Bots follow the same rules.
 - Full no-limit rules:
   - Blinds, including the heads-up rule that the button posts the small blind.
   - Minimum raises, and a short all-in raise does not reopen betting.
@@ -52,6 +53,7 @@ src/equity.js                  Monte Carlo equity (optional opponent range floor
 src/engine.js                  table state machine: blinds, betting rounds, side pots, showdown, history
 src/bot.js                     heuristic bot AI
 src/stats.js                   player statistics from hand histories
+src/match.js                   match rules: borrowing, elimination, chip goal, standings
 src/ui.js                      rendering, animations, action input (slider, presets)
 src/screens.js                 menu, settings, stats, history + replay, help
 src/sound.js                   Web Audio sound effects

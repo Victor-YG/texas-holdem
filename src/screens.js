@@ -26,13 +26,43 @@ export function menuView(items) {
 
 // ---------- settings ----------
 
-export function settingsView(settings, onApply) {
-  const select = (name, label, options, value) => h('label', { class: 'field' },
+function select(name, label, options, value) {
+  return h('label', { class: 'field' },
     h('span', {}, label),
     h('select', { name }, options.map(([v, text]) => h('option', { value: v, selected: String(v) === String(value) }, text))));
+}
+
+/** Play options only; they apply immediately to the current game. */
+export function settingsView(settings, onApply) {
   const checkbox = (name, label) => h('label', { class: 'field' },
     h('span', {}, label), h('input', { type: 'checkbox', name, checked: !!settings[name] }));
 
+  const form = h('form', { class: 'settings' },
+    select('speed', 'Game speed', [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']], settings.speed),
+    checkbox('hints', 'Show odds hints'),
+    checkbox('sound', 'Sound effects'),
+    h('p', { class: 'note' }, 'Table size, blinds, chip goal and borrowing are chosen under Menu → New game.'),
+    h('button', { type: 'submit', class: 'btn primary' }, 'Save'));
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    onApply({
+      speed: fd.get('speed'),
+      hints: fd.get('hints') === 'on',
+      sound: fd.get('sound') === 'on',
+    });
+  });
+  return form;
+}
+
+// ---------- new game ----------
+
+const TARGETS = [[0, 'No goal (play forever)'], [5000, '5,000'], [10000, '10,000'], [20000, '20,000'], [50000, '50,000'], [100000, '100,000']];
+const BORROWS = [[0, 'None (bust = out)'], [1, '1'], [2, '2'], [3, '3'], [5, '5'], [10, '10'], [-1, 'Unlimited']];
+
+export function newGameView(settings, onStart) {
+  const error = h('p', { class: 'note neg', hidden: true });
   const form = h('form', { class: 'settings' },
     h('h3', {}, 'Table'),
     select('numBots', 'Opponents', [[1, '1 (heads-up)'], [2, '2'], [3, '3'], [4, '4'], [5, '5 (6-max)']], settings.numBots),
@@ -40,29 +70,54 @@ export function settingsView(settings, onApply) {
     select('blinds', 'Blinds', [['5/10', '5 / 10'], ['10/20', '10 / 20'], ['25/50', '25 / 50'], ['50/100', '50 / 100']],
       `${settings.smallBlind}/${settings.bigBlind}`),
     select('stackBB', 'Buy-in', [[50, '50 big blinds'], [100, '100 big blinds'], [200, '200 big blinds']], settings.stackBB),
-    h('h3', {}, 'Play'),
-    select('speed', 'Game speed', [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']], settings.speed),
-    checkbox('hints', 'Show odds hints'),
-    checkbox('sound', 'Sound effects'),
-    h('p', { class: 'note' }, 'Changing table options starts a new table with fresh stacks.'),
-    h('button', { type: 'submit', class: 'btn primary' }, 'Save'));
+    h('h3', {}, 'Match'),
+    select('target', 'Win at (chips)', TARGETS, settings.target),
+    select('maxBorrows', 'Borrows per player', BORROWS, settings.maxBorrows),
+    h('p', { class: 'note' },
+      'The first player to reach the goal wins (you can choose to keep playing). A player who busts borrows a buy-in from the bank; ',
+      'with no borrows left, they are out. Bots follow the same rules.'),
+    error,
+    h('button', { type: 'submit', class: 'btn primary' }, 'Start new game'));
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(form);
     const [sb, bb] = String(fd.get('blinds')).split('/').map(Number);
-    onApply({
+    const next = {
       numBots: Number(fd.get('numBots')),
       difficulty: fd.get('difficulty'),
       smallBlind: sb,
       bigBlind: bb,
       stackBB: Number(fd.get('stackBB')),
-      speed: fd.get('speed'),
-      hints: fd.get('hints') === 'on',
-      sound: fd.get('sound') === 'on',
-    });
+      target: Number(fd.get('target')),
+      maxBorrows: Number(fd.get('maxBorrows')),
+    };
+    const buyIn = next.stackBB * bb;
+    if (next.target > 0 && next.target <= buyIn) {
+      error.textContent = `The goal must be more than the buy-in (${fmt(buyIn)}). Pick a higher goal or smaller blinds/buy-in.`;
+      error.hidden = false;
+      return;
+    }
+    onStart(next);
   });
   return form;
+}
+
+// ---------- game over ----------
+
+export function gameOverView({ detail, rows, winner, maxBorrows, actions }) {
+  const limit = maxBorrows < 0 ? '' : ` / ${maxBorrows}`;
+  return h('div', { class: 'game-over' },
+    h('p', { class: 'go-detail' }, detail),
+    h('div', { class: 'standings' },
+      h('div', { class: 'st-row st-head' }, h('span', {}, '#'), h('span', {}, 'Player'), h('span', {}, 'Chips'), h('span', {}, 'Borrowed')),
+      rows.map((r, i) => h('div', { class: `st-row${r.seat === winner ? ' st-win' : ''}${r.out ? ' st-out' : ''}` },
+        h('span', {}, r.seat === winner ? '🏆' : String(i + 1)),
+        h('span', {}, `${r.avatar ?? ''} ${r.seat === 0 ? 'You' : r.name}`, r.out ? h('em', {}, ' out') : null),
+        h('span', { class: 'st-num' }, fmt(r.chips)),
+        h('span', { class: 'st-num' }, `${r.borrows}${limit}`)))),
+    h('div', { class: 'go-actions' }, actions.map(({ label, primary, onclick }) =>
+      h('button', { class: `btn${primary ? ' primary' : ''}`, onclick }, label))));
 }
 
 // ---------- stats ----------
@@ -243,6 +298,8 @@ export function helpView() {
       h('li', {}, 'Open https://victor-yg.github.io/texas-holdem/ in Chrome on your phone.'),
       h('li', {}, 'Tap the ⋮ menu → “Add to Home screen” (or “Install app”).'),
       h('li', {}, 'Launch it from your home screen: it runs full-screen and works offline.')),
+    h('h3', {}, 'Goal and borrowing'),
+    h('p', {}, 'Each game has a chip goal (10,000 by default): the first player to reach it wins, and you can choose to keep playing afterwards. If you bust, you can borrow another buy-in from the bank, up to the limit you chose (5 by default). Run out of borrows and you are out. Bots play by the same rules, and the last player standing also wins. Pick the goal and limit under Menu → New game.'),
     h('h3', {}, 'How to play'),
     h('p', {}, 'No-limit Texas Hold’em. Each player gets two private cards; five shared cards come in three rounds (flop, turn, river). Make the best five-card hand from any of your seven cards, or make everyone else fold.'),
     h('p', {}, 'Tap Raise to open the bet slider, choose an amount (or a preset), then tap the button again to confirm. Tap a bot to see its style. On a keyboard: R raise, C call, K check, F fold, Space deals the next hand.'),
